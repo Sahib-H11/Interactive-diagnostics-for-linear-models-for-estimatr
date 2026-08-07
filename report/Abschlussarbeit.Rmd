@@ -1,0 +1,128 @@
+---
+title: "Interactive Diagnostics for Linear Models Using estimatr and Shiny"
+#subtitle: "Subtitle"
+type: "Advanced R for Econometricians Final Project"
+author:
+  - name: "Sahib Hasanov"
+    studid: "269292"
+    discipline: "M.Sc. Econometrics"
+    semester: "4"
+    university: "TU Dortmund"
+  - name: "Ayberk Pandır"
+    studid: "3190971"
+    discipline: "M.Sc. Business Information Systems"
+    semester: "6"
+    university: "University of Duisburg-Essen"
+date: "today"
+supervisor:
+  - "Dr. Martin Christopher Arnold"
+  - "M.Sc. Martin Schmelzer"
+#estdegree_semester: "Summer Term 2026"
+deadline: "18 September 2026"
+output:
+  pdf_document:
+    keep_tex: yes
+    template: template.tex
+    fig_caption: yes
+    citation_package: biblatex
+    number_sections: true
+toc: true
+lot: true
+lof: true
+graphics: true
+tables: true
+biblio-title: References
+fontsize: 11pt
+geometry: lmargin=5cm,rmargin=2.5cm,tmargin=2.5cm,bmargin=2.5cm
+biblio-files: references.bib
+classoption: a4paper
+language: english
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gt)
+library(dplyr)
+library(broom)
+```
+
+
+# Introduction
+ 
+## Project Motivation
+ 
+## Project Objectives
+ 
+## Structure of the Report
+ 
+ 
+# Project Scope and Requirements
+ 
+## Project Scope
+ 
+## Project Requirements
+ 
+ 
+# Econometric Background
+ 
+## Linear Regression and Ordinary Least Squares
+ 
+## Classical Standard Errors
+ 
+## Heteroskedasticity and Robust Standard Errors
+ 
+ 
+# Regression Diagnostics
+ 
+## Residuals versus Fitted Plot
+ 
+## Normal QQ Plot
+ 
+## Studentized Breusch--Pagan Test
+ 
+## Variance Inflation Factors
+ 
+ 
+# Software Architecture and Data Workflow
+ 
+## Project Structure
+ 
+## Data Validation
+ 
+## Data Preparation and Missing-Data Handling
+ 
+## Model Estimation Workflow
+ 
+ 
+# Advanced R Implementation
+ 
+## Modular Function Design
+ 
+## Functional Programming with purrr
+ 
+## S3 Object-Oriented Programming
+ 
+ 
+# Shiny Application
+ 
+This section will document the Shiny application.
+ 
+## User Interface
+ 
+## Reactive Workflow
+ 
+## Backend Integration
+
+ 
+# Economic Application and Results
+ 
+ 
+# Testing and Limitations
+ 
+## Testing
+ 
+## Limitations
+ 
+ 
+# Conclusion
+This section will summarize the main outcomes, limitations, and contributions of the project.
