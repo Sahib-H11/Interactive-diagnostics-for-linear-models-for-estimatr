@@ -13,8 +13,21 @@ run_regression <- function(
     independent_vars,
     se_type = "HC3"
 ) {
-  
-  prepared_data <- prepare_model_data(
+    allowed_se_types <- c(
+      "classical",
+      "HC1",
+      "HC2",
+      "HC3"
+    )
+    
+    if (!(se_type %in% allowed_se_types)) {
+      stop(
+        "The selected standard error type is not supported.",
+        call. = FALSE
+      )
+    }
+    
+    prepared_data <- prepare_model_data(
     data = data,
     dependent_var = dependent_var,
     independent_vars = independent_vars

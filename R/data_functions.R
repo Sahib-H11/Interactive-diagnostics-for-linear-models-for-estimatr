@@ -111,7 +111,26 @@ validate_variables <- function(
       call. = FALSE
     )
   }
+  non_numeric_independent_vars <- independent_vars[
+    !vapply(
+      data[independent_vars],
+      is.numeric,
+      logical(1)
+    )
+  ]
   
+  if (length(non_numeric_independent_vars) > 0L) {
+    stop(
+      paste(
+        "The selected independent variables must be numeric:",
+        paste(
+          non_numeric_independent_vars,
+          collapse = ", "
+        )
+      ),
+      call. = FALSE
+    )
+  }
   invisible(TRUE)
 }
 
