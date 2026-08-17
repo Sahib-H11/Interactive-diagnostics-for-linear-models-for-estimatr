@@ -48,21 +48,59 @@ library(broom)
 
 
 # Introduction
- 
+
 ## Project Motivation
- 
+
+R offers a wide range of packages and functions for regression analysis, providing considerable flexibility for different analytical needs. However, model estimation, the choice of standard errors, output preparation, and diagnostic checks can be carried out as separate steps. Especially for less experienced users, this can make the overall workflow harder to follow.
+
+The goal of this project is not to develop a new regression method. Instead, we want to bring existing tools for model estimation and regression diagnostics together in a single workflow. Diagnostic checks are an important part of evaluating a regression model, but they may only be considered after the main results have already been produced. One motivation for the application is therefore to make diagnostic information a more direct part of the regression workflow.
+
+One reason for choosing `estimatr` is that its `lm_robust()` function supports different standard error specifications (Classical, HC1, HC2, and HC3) within the same regression framework. The application is planned to allow users to choose between these options directly. This makes the distinction between classical and heteroskedasticity-robust standard errors a visible part of the analysis, rather than something hidden in the underlying code.
+
+The project also has a programming motivation. Instead of placing all calculations directly inside the Shiny application, repeated tasks are separated into reusable functions. This should make the statistical backend easier to understand, test, and extend. Later stages of the project will build on this structure by adding functional programming with `purrr` and a custom S3 result object.
+
 ## Project Objectives
+
+The main objective of this project is to build a locally runnable Shiny application that lets users estimate linear regression models and examine a selected set of regression diagnostics.
  
+In the final application, users will be able to work with a built-in example dataset or upload a supported CSV file. The model will be defined manually by selecting one dependent variable and one or more independent variables. Users will also be able to choose the standard error type used for the regression (Classical, HC1, HC2, or HC3).
+ 
+The main regression results will be produced using `estimatr::lm_robust()`. An auxiliary `stats::lm()` model will also be estimated using the same cleaned data and the same model formula to support diagnostic procedures that require a standard `lm` object. In this setup, `lm_robust()` remains the project's primary estimation method, while the standard `lm()` model plays a supporting role, used only to enable the diagnostic procedures that require it.
+ 
+On the diagnostics side, the application will include a residuals-versus-fitted plot, a normal QQ plot, the Studentized Breusch--Pagan test, and variance inflation factor analysis. Rather than trying to cover a wide range of diagnostic tools, the goal is to offer a focused, easy-to-follow set that helps users examine selected diagnostic properties of a linear regression model.
+ 
+From a programming standpoint, the main goal is to build a modular backend made up of reusable functions that work independently of the Shiny interface. This structure will later be extended with a meaningful use of functional programming through `purrr`, along with a custom S3 result object.
+
 ## Structure of the Report
+
+The next section of the report outlines the scope of the project and its main requirements, followed by the econometric background needed for the rest of the report, including linear regression, classical and heteroskedasticity-robust standard errors, and the diagnostic methods used in the project.
  
+The following sections describe the software architecture, the data preparation process, and the model estimation workflow. The use of `purrr` for functional programming and the design of the custom S3 result object are covered next, followed by an explanation of how this backend is connected to the Shiny application.
  
+The final part of the report presents a practical example based on an economics-related dataset. This is followed by a discussion of testing and the main limitations of the project, and the report closes with a conclusion.
+
 # Project Scope and Requirements
- 
+
 ## Project Scope
- 
+
+The project focuses on linear regression estimation and a selected set of regression diagnostics. The main regression results will be produced using `estimatr::lm_robust()`. A standard `stats::lm()` model will also be created as an auxiliary model for diagnostic procedures, using the same cleaned data and the same model formula.
+
+The core scope of the final application includes a built-in example dataset, support for uploading CSV files, selection of the dependent and independent variables, manual model definition, and a choice between Classical, HC1, HC2, and HC3 standard errors. In addition, the core scope covers a selected set of diagnostic tests and plots, transparent handling of missing data, essential input validation, a custom S3 result object, and a meaningful use of `purrr` for comparing standard-error specifications.
+
+The scope of the project is deliberately kept focused. Automatic model selection, stepwise regression, LASSO, data simulation, R6 classes, and the development of an R package are not part of the core scope. Online deployment is also not a requirement, as the application is intended to run locally. Support for categorical predictors and additional diagnostic features will only be considered as optional extensions once the core application and report are stable.
+
+The priority is not to add as many features as possible, but to make sure that the selected core components work together reliably and remain easy to follow. Additional features will therefore only be considered once the core regression workflow, diagnostics, Shiny application, and report are sufficiently stable.
+
 ## Project Requirements
+
+The project requirements include both the functional requirements of the application and the technical conditions needed for the regression workflow to run reliably. S3 will be used for the object-oriented programming component, while the diagnostic component will remain focused on the Studentized Breusch--Pagan test, VIF analysis, and selected diagnostic plots. Data simulation and online deployment are not required, and the application is intended to run locally. The model itself will be defined manually by the user.
  
+Before a model can be estimated, a few basic conditions need to be met. A usable data object must be available, a valid dependent variable and at least one independent variable must be selected, and enough complete observations must remain for estimation. Missing observations will be removed based only on the variables selected for the model, and the user will be informed of how many observations were removed.
  
+The validation logic focuses on basic and predictable issues that can be identified before estimation. The goal is not to build an extensive system that attempts to catch every possible regression problem in advance. More specific estimation issues, such as constant variables, singular models, or other invalid model specifications, will instead be handled through controlled error messages.
+ 
+It is also a core requirement that the main `estimatr::lm_robust()` model and the auxiliary `stats::lm()` model used for diagnostics are estimated using the same cleaned dataset and the same model formula. This ensures that the main regression results and the diagnostic results are not based on different sets of observations.
+
 # Econometric Background
  
 ## Linear Regression and Ordinary Least Squares
@@ -87,13 +125,48 @@ library(broom)
  
 ## Project Structure
  
+Rather than keeping everything in a single file, the different parts of the project are organized into separate files and folders based on their purpose. Early regression experiments and development code are kept in `scripts/prototype.R`, while functions intended to be reused by the application are kept in the `R/` folder.
+
+After the initial prototype, the data-checking and data-preparation functions were placed in `R/data_functions.R`, while the model estimation function was placed in `R/model_functions.R`. In later stages of the project, separate R files will be added for diagnostics, plots, result tables, and S3 methods. Manual test scenarios are also planned to be kept in `scripts/test_cases.R`.
+
+This structure keeps experimental development code separate from the application's core analysis functions. It also allows the data-preparation and model-estimation functions to be run and checked independently of the Shiny interface.
+
 ## Data Validation
  
+Two functions were developed to carry out basic data and variable checks before a model is estimated: `check_data()` and `validate_variables()`.
+
+`check_data()` first checks whether a data object has been provided. It then checks whether the object is a data frame and whether it contains at least one observation and one variable. If any of these conditions are not met, the process stops with an informative error message.
+
+`validate_variables()` checks the variable selections made for the model. Exactly one dependent variable and at least one independent variable must be selected. The function checks whether all selected variables are present in the dataset, and it does not allow the same variable to be used as both the dependent and an independent variable. The current implementation also checks that the dependent variable is numeric.
+
+Rather than being built directly into the model estimation function, these checks are kept in separate functions. This keeps data validation and model estimation as distinct tasks and allows the same validation functions to be reused later in the Shiny application. Using `call. = FALSE` in the error messages suppresses the function call from the error output, keeping the messages cleaner and easier to read.
+
 ## Data Preparation and Missing-Data Handling
  
+Model estimation only requires the variables selected by the user. For this reason, `prepare_model_data()` first creates a smaller model dataset consisting of the dependent variable and the selected independent variables.
+
+Complete observations are then identified based only on these variables using `stats::complete.cases()`. This function returns a logical vector indicating which observations contain no missing values. Any observation with a missing value in one of the selected model variables is removed before the model is estimated. As a result, missing values in variables that are not part of the model do not lead to unnecessary loss of observations.
+
+The function also records the initial number of observations, the number removed due to missing values, and the number remaining after cleaning. This information can later be used to show the user how many observations the model was estimated on and how many were dropped during data preparation.
+
+After cleaning, the function checks whether enough observations remain for model estimation. In the current implementation, the minimum number of observations is defined as the number of independent variables plus two. This basic check is meant to prevent estimation from continuing when too few complete observations remain. If the condition is not met, the process stops with an explanatory error message.
+
+Missing observations are not handled separately for the two models. Once the dataset has been prepared and cleaned, both the main `estimatr::lm_robust()` model and the auxiliary `stats::lm()` model used for diagnostics are estimated using the same cleaned dataset. This ensures that the main regression results and the diagnostic results are based on the same set of observations.
+
 ## Model Estimation Workflow
  
- 
+The model estimation process was first developed as a simple prototype, independently of the Shiny application. At this stage, the built-in `mtcars` dataset was used. `mtcars` is not the dataset that will be used for the project's final economic application; it was used only to develop and test the initial regression workflow.
+
+In the prototype, the model `mpg ~ wt + hp` was estimated in three different ways. First, a standard `stats::lm()` model was fitted. The same model was then estimated twice using `estimatr::lm_robust()`, once with classical standard errors and once with HC3 standard errors. This initial comparison allowed us to examine how `lm_robust()` could be used within the planned regression workflow. Because the data and model formula were unchanged, the coefficient estimates remained the same, while changing the standard-error specification could affect measures of statistical uncertainty such as standard errors, p-values, and confidence intervals.
+
+Since the model results needed to be used programmatically in later stages, we did not rely only on console output. `broom::tidy()` was used to extract term-level results such as coefficient estimates, standard errors, p-values, and confidence intervals in a tidy format. `broom::glance()` was used to extract model-level summary statistics. The prototype also examined fitted values and residuals, compared the main results of the three models in a common table, and carried out equality checks on the coefficient estimates and standard errors. These comparisons were used during development to inspect the behaviour of the model objects more directly.
+
+After the initial prototype, the `run_regression()` function was created to make the workflow reusable. The function takes the dataset, the dependent variable, the independent variables, and the selected standard error type as arguments. Before estimation, `prepare_model_data()` is called to prepare the selected variables, remove incomplete observations, and record the observation counts.
+
+The model formula is then constructed from the selected variable names using `stats::reformulate()`. This provides a programmatic way to construct an R model formula from variable names supplied as character values. The same cleaned data and the same formula are then used to estimate the main regression model with `estimatr::lm_robust()` and the auxiliary diagnostic model with `stats::lm()`.
+
+The `run_regression()` function also stores the formula, the cleaned model data, the selected standard error type, and the observation counts alongside the two model objects in the same result list. As a result, the regression steps that were initially carried out one by one in the prototype have been turned into a reusable model estimation function that can be called independently of the Shiny interface.
+
 # Advanced R Implementation
  
 ## Modular Function Design
@@ -126,3 +199,4 @@ This section will document the Shiny application.
  
 # Conclusion
 This section will summarize the main outcomes, limitations, and contributions of the project.
+
