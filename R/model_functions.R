@@ -38,15 +38,37 @@ run_regression <- function(
     response = dependent_var
   )
   
-  robust_model <- estimatr::lm_robust(
-    formula = model_formula,
-    data = prepared_data$data,
-    se_type = se_type
+  robust_model <- tryCatch(
+    estimatr::lm_robust(
+      formula = model_formula,
+      data = prepared_data$data,
+      se_type = se_type
+    ),
+    error = function(e) {
+      stop(
+        paste(
+          "Robust model estimation failed:",
+          conditionMessage(e)
+        ),
+        call. = FALSE
+      )
+    }
   )
   
-  diagnostic_model <- stats::lm(
-    formula = model_formula,
-    data = prepared_data$data
+  diagnostic_model <- tryCatch(
+    stats::lm(
+      formula = model_formula,
+      data = prepared_data$data
+    ),
+    error = function(e) {
+      stop(
+        paste(
+          "Diagnostic model estimation failed:",
+          conditionMessage(e)
+        ),
+        call. = FALSE
+      )
+    }
   )
   
   result <- list(

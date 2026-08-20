@@ -256,3 +256,32 @@ missing_independent_message <- tryCatch(
 print(missing_independent_message)
 
 
+# TEST 13: Controlled model estimation failure
+cat("\n=== TEST 13: Controlled model estimation failure ===\n")
+
+invalid_model_data <- mtcars
+invalid_model_data$hp[1] <- Inf
+
+model_error_message <- tryCatch(
+  run_regression(
+    data = invalid_model_data,
+    dependent_var = "mpg",
+    independent_vars = c("wt", "hp"),
+    se_type = "HC3"
+  ),
+  error = function(e) {
+    conditionMessage(e)
+  }
+)
+
+print(model_error_message)
+
+stopifnot(
+  startsWith(
+    model_error_message,
+    "Diagnostic model estimation failed:"
+  )
+)
+
+cat("\nTEST 13 PASSED\n")
+
