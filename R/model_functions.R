@@ -12,7 +12,9 @@ run_regression <- function(
     dependent_var,
     independent_vars,
     se_type = "HC3"
-) {
+) 
+  
+  {
     allowed_se_types <- c(
       "classical",
       "HC1",
@@ -83,4 +85,74 @@ run_regression <- function(
   )
   
   return(result)
+}
+
+# Compare different standard error specifications
+compare_standard_errors <- function(
+    data,
+    dependent_var,
+    independent_vars
+) {
+  
+  prepared_data <- prepare_model_data(
+    data = data,
+    dependent_var = dependent_var,
+    independent_vars = independent_vars
+  )
+  
+  model_formula <- stats::reformulate(
+    termlabels = independent_vars,
+    response = dependent_var
+  )
+  
+  se_types <- c(
+    "classical",
+    "HC1",
+    "HC2",
+    "HC3"
+  )
+  
+  models <- purrr::map(
+    se_types,
+    function(type) {
+      estimatr::lm_robust(
+        formula = model_formula,
+        data = prepared_data$data,
+        se_type = type
+      )
+    }
+  )
+  
+  comparison_results <- purrr::map2(
+    models,
+    se_types,
+    function(model, type) {
+      
+      model_results <- broom::tidy(
+        model,
+        conf.int = TRUE
+      )
+      
+      model_results$se_type <- type
+      
+      model_results[
+        ,
+        c(
+          "se_type",
+          "term",
+          "estimate",
+          "std.error",
+          "conf.low",
+          "conf.high",
+          "p.value"
+        )
+      ]
+    }
+  )
+  
+  comparison_table <- purrr::list_rbind(
+    comparison_results
+  )
+  
+  return(comparison_table)
 }

@@ -50,122 +50,213 @@ library(broom)
 # Introduction
 
 ## Project Motivation
-
 R offers a wide range of packages and functions for regression analysis, providing considerable flexibility for different analytical needs. However, model estimation, the choice of standard errors, output preparation, and diagnostic checks can be carried out as separate steps. Especially for less experienced users, this can make the overall workflow harder to follow.
-
 The goal of this project is not to develop a new regression method. Instead, we want to bring existing tools for model estimation and regression diagnostics together in a single workflow. Diagnostic checks are an important part of evaluating a regression model, but they may only be considered after the main results have already been produced. One motivation for the application is therefore to make diagnostic information a more direct part of the regression workflow.
-
 One reason for choosing `estimatr` is that its `lm_robust()` function supports different standard error specifications (Classical, HC1, HC2, and HC3) within the same regression framework. The application is planned to allow users to choose between these options directly. This makes the distinction between classical and heteroskedasticity-robust standard errors a visible part of the analysis, rather than something hidden in the underlying code.
-
-The project also has a programming motivation. Instead of placing all calculations directly inside the Shiny application, repeated tasks are separated into reusable functions. This should make the statistical backend easier to understand, test, and extend. Later stages of the project will build on this structure by adding functional programming with `purrr` and a custom S3 result object.
+The project also has a programming motivation. Instead of placing all calculations directly inside the Shiny application, repeated tasks are separated into reusable functions. This should make the statistical backend easier to understand, test, and extend. 
 
 ## Project Objectives
-
 The main objective of this project is to build a locally runnable Shiny application that lets users estimate linear regression models and examine a selected set of regression diagnostics.
- 
-In the final application, users will be able to work with a built-in example dataset or upload a supported CSV file. The model will be defined manually by selecting one dependent variable and one or more independent variables. Users will also be able to choose the standard error type used for the regression (Classical, HC1, HC2, or HC3).
- 
+In the final application, users will be able to work with a built-in example dataset or upload a supported CSV file. The model will be defined manually by selecting one dependent variable and one or more independent variables. Users will also be able to choose the standard error type used for the regression (Classical, HC1, HC2, or HC3). 
 The main regression results will be produced using `estimatr::lm_robust()`. An auxiliary `stats::lm()` model will also be estimated using the same cleaned data and the same model formula to support diagnostic procedures that require a standard `lm` object. In this setup, `lm_robust()` remains the project's primary estimation method, while the standard `lm()` model plays a supporting role, used only to enable the diagnostic procedures that require it.
- 
 On the diagnostics side, the application will include a residuals-versus-fitted plot, a normal QQ plot, the Studentized Breusch--Pagan test, and variance inflation factor analysis. Rather than trying to cover a wide range of diagnostic tools, the goal is to offer a focused, easy-to-follow set that helps users examine selected diagnostic properties of a linear regression model.
- 
+The completed workflow will also be demonstrated using an economics-related dataset in order to show how the application can be used in an empirical setting.
 From a programming standpoint, the main goal is to build a modular backend made up of reusable functions that work independently of the Shiny interface. This structure will later be extended with a meaningful use of functional programming through `purrr`, along with a custom S3 result object.
 
 ## Structure of the Report
-
-The next section of the report outlines the scope of the project and its main requirements, followed by the econometric background needed for the rest of the report, including linear regression, classical and heteroskedasticity-robust standard errors, and the diagnostic methods used in the project.
- 
+The next section of the report outlines the scope of the project and its main requirements, followed by the econometric background needed for the rest of the report, including linear regression, classical and heteroskedasticity-robust standard errors, and the diagnostic methods used in the project. 
 The following sections describe the software architecture, the data preparation process, and the model estimation workflow. The use of `purrr` for functional programming and the design of the custom S3 result object are covered next, followed by an explanation of how this backend is connected to the Shiny application.
- 
-The final part of the report presents a practical example based on an economics-related dataset. This is followed by a discussion of testing and the main limitations of the project, and the report closes with a conclusion.
+The final sections of the report present a practical example based on an economics-related dataset. This is followed by a discussion of testing and the main limitations of the project, and the report closes with a conclusion.
 
 # Project Scope and Requirements
-
 ## Project Scope
-
 The project focuses on linear regression estimation and a selected set of regression diagnostics. The main regression results will be produced using `estimatr::lm_robust()`. A standard `stats::lm()` model will also be created as an auxiliary model for diagnostic procedures, using the same cleaned data and the same model formula.
 
-The core scope of the final application includes a built-in example dataset, support for uploading CSV files, selection of the dependent and independent variables, manual model definition, and a choice between Classical, HC1, HC2, and HC3 standard errors. In addition, the core scope covers a selected set of diagnostic tests and plots, transparent handling of missing data, essential input validation, a custom S3 result object, and a meaningful use of `purrr` for comparing standard-error specifications.
-
+The core scope of the final application includes a built-in example dataset, support for uploading CSV files, selection of the dependent and independent variables, manual model definition, and a choice between Classical, HC1, HC2, and HC3 standard errors. The application will also provide a regression coefficient table, a selected set of diagnostic tests and plots, transparent handling of missing data, essential input validation, and controlled error messages.
+The programming scope will also include a custom S3 result object and a meaningful use of `purrr` for comparing standard-error specifications.
 The scope of the project is deliberately kept focused. Automatic model selection, stepwise regression, LASSO, data simulation, R6 classes, and the development of an R package are not part of the core scope. Online deployment is also not a requirement, as the application is intended to run locally. Support for categorical predictors and additional diagnostic features will only be considered as optional extensions once the core application and report are stable.
-
-The priority is not to add as many features as possible, but to make sure that the selected core components work together reliably and remain easy to follow. Additional features will therefore only be considered once the core regression workflow, diagnostics, Shiny application, and report are sufficiently stable.
+The priority is to ensure that the selected regression, diagnostic, and programming components work together reliably and remain easy to follow, rather than trying to include as many features as possible.
 
 ## Project Requirements
-
-The project requirements include both the functional requirements of the application and the technical conditions needed for the regression workflow to run reliably. S3 will be used for the object-oriented programming component, while the diagnostic component will remain focused on the Studentized Breusch--Pagan test, VIF analysis, and selected diagnostic plots. Data simulation and online deployment are not required, and the application is intended to run locally. The model itself will be defined manually by the user.
- 
-Before a model can be estimated, a few basic conditions need to be met. A usable data object must be available, a valid dependent variable and at least one independent variable must be selected, and enough complete observations must remain for estimation. Missing observations will be removed based only on the variables selected for the model, and the user will be informed of how many observations were removed.
- 
-The validation logic focuses on basic and predictable issues that can be identified before estimation. The goal is not to build an extensive system that attempts to catch every possible regression problem in advance. More specific estimation issues, such as constant variables, singular models, or other invalid model specifications, will instead be handled through controlled error messages.
- 
-It is also a core requirement that the main `estimatr::lm_robust()` model and the auxiliary `stats::lm()` model used for diagnostics are estimated using the same cleaned dataset and the same model formula. This ensures that the main regression results and the diagnostic results are not based on different sets of observations.
+The project requirements include both the functional requirements of the application and the technical conditions needed for the regression workflow to operate reliably. The model is defined manually by the user, and the final application is intended to run locally.
+Before a model can be estimated, several basic conditions must be satisfied. A valid data frame must be available, exactly one dependent variable and at least one independent variable must be selected, and all selected variables must exist in the dataset. The dependent variable cannot also be selected as an independent variable. In the current version of the project, both the dependent variable and the selected independent variables must be numeric.
+Missing observations are handled only for the variables included in the selected model. Observations containing missing values in these variables are removed before estimation, while missing values in variables that are not part of the model do not affect the estimation sample. The number of removed observations and the number of complete observations remaining are recorded so that this information can later be shown to the user.
+The workflow also checks whether enough complete observations remain after missing values have been removed. In the current implementation, the minimum required number of observations is defined as the number of independent variables plus two. If this condition is not satisfied, estimation stops with an explanatory error message.
+The validation logic focuses on basic and predictable problems that can be identified before estimation. It is not intended to anticipate every possible model-specific problem. If an additional problem causes either regression model to fail during estimation, the error is captured and reported through a controlled error message.
+It is also a core requirement that the main `estimatr::lm_robust()` model and the auxiliary `stats::lm()` model used for diagnostics are estimated using exactly the same cleaned dataset and the same model formula. This ensures that the main regression results and the diagnostic results refer to the same estimation sample.
 
 # Econometric Background
  
 ## Linear Regression and Ordinary Least Squares
+A multiple linear regression model relates a dependent variable to one or more independent variables and can be written as
+
+$$
+y_i = \beta_0 + \beta_1 x_{i1} + \dots + \beta_k x_{ik} + \varepsilon_i,
+$$
+
+where $y_i$ is the dependent variable, $x_{i1}, \dots, x_{ik}$ are the independent variables, $\beta_0, \dots, \beta_k$ are the unknown regression coefficients, and $\varepsilon_i$ is the error term representing factors that are not explicitly included in the model.
+
+The ordinary least squares (OLS) method estimates the regression coefficients by choosing the values that minimize the sum of squared differences between the observed and fitted values:
+
+$$
+\hat{\beta}
+=
+\arg\min_{\beta}
+\sum_{i=1}^{n}
+(y_i-x_i'\beta)^2.
+$$
+
+When the design matrix has full column rank, the OLS estimator can also be written in matrix form as
+
+$$
+\hat{\beta}=(X'X)^{-1}X'y.
+$$
+
+Once the model has been estimated, the fitted value for observation $i$ is denoted $\hat{y}_i$, and the residual is given by
+
+$$
+\hat{\varepsilon}_i=y_i-\hat{y}_i.
+$$
+
+It is important to distinguish between the error term and the residual. The error term $\varepsilon_i$ is an unobservable component of the population model, whereas the residual $\hat{\varepsilon}_i$ can only be computed once the model has been estimated. For this reason, it is the residuals — not the errors — that are examined in the regression diagnostics discussed later in this report.
+
+Under standard conditions such as random sampling, linearity in the parameters, the absence of perfect multicollinearity, and a zero conditional mean of the error term, OLS produces unbiased coefficient estimates. If the conditional variance of the error term is also constant, meaning that the errors are homoskedastic, the Gauss--Markov theorem states that OLS is the best linear unbiased estimator (BLUE). Homoskedasticity is therefore not required for the unbiasedness of the OLS coefficients, but it is required for the conventional homoskedastic variance and standard error formulas to be valid. This distinction underlies the difference between classical and heteroskedasticity-robust standard errors discussed in the following sections.
+In this project, the main regression model is estimated using `estimatr::lm_robust()`. When the same model formula and estimation sample are used, changing the standard error specification does not change the underlying OLS coefficient estimates; instead, it affects the estimated standard errors and the related inference measures. An auxiliary `stats::lm()` model is also fitted using the same cleaned data and model formula and is used for the diagnostic procedures discussed later in the report.
+
  
 ## Classical Standard Errors
+
+Under the assumption of homoskedasticity, the conditional variance of the OLS estimator can be written as
+
+$$
+\mathrm{Var}(\hat{\beta} \mid X)
+=
+\sigma^2 (X'X)^{-1},
+$$
+
+where $\sigma^2$ represents the constant conditional variance of the error term. Because this variance is unknown in practice, it is estimated using the regression residuals. The classical standard error of each coefficient is obtained from the corresponding diagonal element of the estimated variance-covariance matrix.
+
+Standard errors are important because they describe the uncertainty surrounding the estimated regression coefficients. Together with the coefficient estimates, they are used to calculate quantities such as t-statistics, p-values, and confidence intervals.
+
+The classical standard error formula relies on the homoskedasticity assumption. If the error variance differs across observations, the classical standard errors may understate or overstate the sampling uncertainty of the coefficient estimates. The OLS coefficients may still remain unbiased under the assumptions discussed in the previous section, but the resulting statistical inference based on classical standard errors can become unreliable. This limitation motivates the use of heteroskedasticity-robust standard errors, which are discussed in the next section.
+
+In this project, classical standard errors are one of the four standard error options available through `estimatr::lm_robust()`, together with HC1, HC2, and HC3. Selecting `se_type = "classical"` uses the classical specification, while the other options provide heteroskedasticity-robust alternatives.
  
 ## Heteroskedasticity and Robust Standard Errors
+
+The homoskedasticity assumption requires the conditional variance of the error term to be constant across observations. When this variance differs across observations, the errors are heteroskedastic. In this case,
+
+$$
+Var(\varepsilon_i \mid X)
+$$
+
+is not necessarily the same for every observation.
+
+When heteroskedasticity is present, the OLS coefficient estimates may remain unbiased under the conditions discussed earlier, but the classical standard error formula may no longer describe their sampling uncertainty correctly. As a result, standard errors, p-values, and confidence intervals based on the classical formula can become misleading. Heteroskedasticity therefore affects statistical inference rather than automatically changing the OLS coefficient estimates themselves.
+
+Heteroskedasticity-robust standard errors address this problem by using an alternative estimate of the variance-covariance matrix. A general heteroskedasticity-consistent estimator can be written as
+
+$$
+\widehat{Var}_{HC}(\hat{\beta})
+=
+(X'X)^{-1}X'\hat{\Omega}X(X'X)^{-1},
+$$
+
+where $\hat{\Omega}$ is a diagonal matrix containing estimated observation-specific error variances based on the regression residuals. This form is often referred to as a sandwich estimator.
+
+The project includes three heteroskedasticity-robust options: HC1, HC2, and HC3. Their main difference is how the squared residuals are adjusted when estimating the variance. Let $h_{ii}$ denote the leverage of observation $i$. HC1 applies a degrees-of-freedom scaling based on the sample size and number of estimated coefficients. HC2 adjusts the squared residuals by dividing them by $1-h_{ii}$, while HC3 uses the stronger adjustment $(1-h_{ii})^2$ in the denominator. 
+
+None of these alternatives should be treated as universally best. HC1 provides a relatively simple finite-sample adjustment, whereas HC2 and HC3 account directly for leverage. HC3 applies the stronger leverage correction and can therefore be useful when high-leverage observations or smaller samples are a concern, although it may also produce larger standard errors. For this reason, the application does not impose a single robust specification and instead allows the user to choose between Classical, HC1, HC2, and HC3 standard errors.
+
+In this project, the main regression model is estimated with `estimatr::lm_robust()`, and the selected standard error specification is passed through the `se_type` argument. When the model formula and cleaned estimation sample remain unchanged, switching between Classical, HC1, HC2, and HC3 does not change the underlying OLS coefficient estimates. Instead, it changes how the uncertainty around those estimates is calculated. This makes the comparison between classical and robust standard errors a direct part of the regression workflow.
  
  
 # Regression Diagnostics
  
 ## Residuals versus Fitted Plot
+
+The residuals-versus-fitted plot displays the residuals of the auxiliary `lm()` model on the vertical axis against the fitted values on the horizontal axis. In a well-behaved linear model, the residuals should be scattered around zero without a clear systematic pattern and with a roughly constant spread across the range of fitted values.
+
+Systematic deviations from this pattern can point to potential problems. A funnel-shaped pattern, where the spread of the residuals becomes wider or narrower as the fitted values change, may suggest heteroskedasticity. A curved or otherwise non-random pattern may indicate that the linear functional form does not adequately capture the relationship between the dependent and independent variables. The plot is therefore a visual diagnostic and complements the formal heteroskedasticity test discussed later, rather than replacing it.
+
+In the project, the plot is produced by `plot_residuals_vs_fitted()`. The function extracts fitted values and residuals from the auxiliary `stats::lm()` model using `stats::fitted()` and `stats::residuals()`, displays them with `ggplot2`, and adds a horizontal reference line at zero. Because the auxiliary diagnostic model is estimated using the same cleaned data and model formula and does not depend on the selected standard-error type, the residuals used in this plot remain the same when the user switches between Classical, HC1, HC2, and HC3 standard errors.
  
 ## Normal QQ Plot
+
+The Normal QQ (quantile-quantile) plot compares the quantiles of the residuals from the auxiliary `lm()` model with the quantiles of a theoretical normal distribution. If the residuals are approximately normally distributed, the points should lie reasonably close to the reference line. Systematic departures from this line, particularly in the tails, may indicate heavier tails, skewness, or unusual observations.
+
+Normality is not required for the OLS coefficient estimates to be unbiased under the assumptions discussed earlier. It is mainly relevant for exact small-sample inference in the classical linear regression framework, including t-tests, F-tests, and confidence intervals. In larger samples, inference is generally less sensitive to moderate departures from normality. The QQ plot is therefore treated as a visual diagnostic rather than as a formal pass-or-fail test, and no separate numerical normality test is included in the application.
+
+In the project, the plot is produced by `plot_qq()`, which extracts residuals from the auxiliary `stats::lm()` model using `stats::residuals()` and displays them with `ggplot2::stat_qq()` and `ggplot2::stat_qq_line()`. As with the residuals-versus-fitted plot, this diagnostic is based on the auxiliary model and therefore does not change when the user switches between the four available standard-error specifications.
  
 ## Studentized Breusch--Pagan Test
- 
+
+The residuals-versus-fitted plot provides a visual way to examine possible changes in the error variance, while the Studentized Breusch--Pagan test provides a formal assessment of heteroskedasticity.
+
+The null hypothesis of the test is homoskedasticity, meaning that the conditional variance of the error term is constant. The alternative hypothesis is that the variance changes systematically with one or more of the explanatory variables:
+
+$$
+H_0: \text{Homoskedasticity}
+$$
+
+$$
+H_1: \text{Heteroskedasticity}
+$$
+
+Interpretation is based on the resulting p-value. For example, at a 5% significance level, a p-value below 0.05 provides evidence against the null hypothesis and therefore suggests heteroskedasticity. A larger p-value should not be interpreted as proof of homoskedasticity; it only means that there is not sufficient evidence to reject the null hypothesis in the current sample.
+
+The project uses Koenker's studentized version of the Breusch--Pagan test. In `lmtest::bptest()`, this is implemented with `studentize = TRUE`. The studentized modification was developed to reduce the sensitivity of the original test to the normality assumption. Because no separate variance formula is specified in the project, the explanatory variables from the fitted regression model are used in the test.
+
+In the project, `calculate_bp_test()` applies the test to the auxiliary `stats::lm()` model and returns the test statistic, degrees of freedom, p-value, and method name. Together with the residuals-versus-fitted plot, this provides both graphical and formal information about possible heteroskedasticity.
+
 ## Variance Inflation Factors
- 
+
+Variance Inflation Factors (VIFs) are used to assess multicollinearity, that is, the extent to which a predictor is linearly related to the other predictors in a regression model. For each predictor, the VIF is defined as
+
+$$
+VIF_j = \frac{1}{1-R_j^2}
+$$
+
+where $R_j^2$ is obtained by regressing predictor $j$ on the remaining predictors. A VIF of 1 indicates no variance inflation due to linear relationships with the other predictors. Higher values indicate that a larger share of the variation in the predictor can be explained by the remaining predictors, which increases the variance and standard error of the corresponding coefficient estimate. Multicollinearity can therefore reduce the precision of individual coefficient estimates and make their separate effects more difficult to interpret, although it does not by itself make the OLS coefficient estimates biased under the assumptions discussed earlier.
+
+There is no universally agreed VIF threshold above which multicollinearity should automatically be considered problematic. Values such as 5 or 10 are often used as practical rules of thumb, but their interpretation depends on the context of the analysis. A high VIF therefore indicates that multicollinearity deserves further attention, but it does not by itself imply that a predictor must be removed from the model.
+
+VIF calculations require a predictor to be compared with other predictors and are therefore not meaningful for a model containing only one predictor. In this project, `calculate_vif()` first checks the number of predictors in the auxiliary `stats::lm()` model. If only one predictor is present, the function returns an explanatory message instead of a VIF value. Otherwise, it applies `car::vif()` and returns the calculated VIF values together with the corresponding variable names.
  
 # Software Architecture and Data Workflow
  
 ## Project Structure
- 
 Rather than keeping everything in a single file, the different parts of the project are organized into separate files and folders based on their purpose. Early regression experiments and development code are kept in `scripts/prototype.R`, while functions intended to be reused by the application are kept in the `R/` folder.
-
-After the initial prototype, the data-checking and data-preparation functions were placed in `R/data_functions.R`, while the model estimation function was placed in `R/model_functions.R`. In later stages of the project, separate R files will be added for diagnostics, plots, result tables, and S3 methods. Manual test scenarios are also planned to be kept in `scripts/test_cases.R`.
-
-This structure keeps experimental development code separate from the application's core analysis functions. It also allows the data-preparation and model-estimation functions to be run and checked independently of the Shiny interface.
+After the initial prototype, the data-checking and data-preparation functions were placed in `R/data_functions.R`, while the model estimation function was placed in `R/model_functions.R`. The diagnostic functions, plotting functions, and table-formatting functions were subsequently added in `R/diagnostic_functions.R`, `R/plotting_functions.R`, and `R/table_functions.R`. A custom S3 result object will be added in `R/s3_methods.R` in a later stage of the project. Manual test scenarios covering the data-preparation, model-estimation, diagnostic, plotting, and table functions are kept in `scripts/test_cases.R`.
+This structure keeps experimental development code separate from the application's core analysis functions. It allows the main parts of the statistical backend to be run and checked independently of the Shiny interface. The separation also makes it easier to identify which part of the workflow is responsible for a particular task or error, and it means that the Shiny application can later call these reusable functions rather than reproducing the same calculations inside the server logic.
 
 ## Data Validation
- 
 Two functions were developed to carry out basic data and variable checks before a model is estimated: `check_data()` and `validate_variables()`.
-
 `check_data()` first checks whether a data object has been provided. It then checks whether the object is a data frame and whether it contains at least one observation and one variable. If any of these conditions are not met, the process stops with an informative error message.
-
-`validate_variables()` checks the variable selections made for the model. Exactly one dependent variable and at least one independent variable must be selected. The function checks whether all selected variables are present in the dataset, and it does not allow the same variable to be used as both the dependent and an independent variable. The current implementation also checks that the dependent variable is numeric.
-
+`validate_variables()` checks the variable selections made for the model. Exactly one dependent variable and at least one independent variable must be selected. The function checks whether all selected variables are present in the dataset, and it does not allow the same variable to be used as both the dependent and an independent variable. The current implementation also checks that the dependent variable and all selected independent variables are numeric. If one or more independent variables are non-numeric, the function reports which variables caused the problem.
 Rather than being built directly into the model estimation function, these checks are kept in separate functions. This keeps data validation and model estimation as distinct tasks and allows the same validation functions to be reused later in the Shiny application. Using `call. = FALSE` in the error messages suppresses the function call from the error output, keeping the messages cleaner and easier to read.
 
 ## Data Preparation and Missing-Data Handling
- 
-Model estimation only requires the variables selected by the user. For this reason, `prepare_model_data()` first creates a smaller model dataset consisting of the dependent variable and the selected independent variables.
 
-Complete observations are then identified based only on these variables using `stats::complete.cases()`. This function returns a logical vector indicating which observations contain no missing values. Any observation with a missing value in one of the selected model variables is removed before the model is estimated. As a result, missing values in variables that are not part of the model do not lead to unnecessary loss of observations.
+Model estimation only requires the variables selected by the user. Before preparing the model dataset, `prepare_model_data()` calls `check_data()` and `validate_variables()` to check the data and variable selections. It then creates a smaller model dataset consisting only of the dependent variable and the selected independent variables.
 
-The function also records the initial number of observations, the number removed due to missing values, and the number remaining after cleaning. This information can later be used to show the user how many observations the model was estimated on and how many were dropped during data preparation.
+Complete observations are identified based only on these variables using `stats::complete.cases()`. This function returns a logical vector indicating which observations contain no missing values. Any observation with a missing value in one of the selected model variables is removed before the model is estimated. As a result, missing values in variables that are not part of the model do not lead to unnecessary loss of observations.
 
-After cleaning, the function checks whether enough observations remain for model estimation. In the current implementation, the minimum number of observations is defined as the number of independent variables plus two. This basic check is meant to prevent estimation from continuing when too few complete observations remain. If the condition is not met, the process stops with an explanatory error message.
+The function also records the original number of observations, the number removed due to missing values, and the number remaining after cleaning. This information can later be used to show the user how many observations the model was estimated on and how many were dropped during data preparation.
 
-Missing observations are not handled separately for the two models. Once the dataset has been prepared and cleaned, both the main `estimatr::lm_robust()` model and the auxiliary `stats::lm()` model used for diagnostics are estimated using the same cleaned dataset. This ensures that the main regression results and the diagnostic results are based on the same set of observations.
+After cleaning, the function checks whether enough observations remain for model estimation. In the current implementation, the minimum number of observations is defined as the number of independent variables plus two. This basic check is intended to prevent estimation from continuing when too few complete observations remain. If the condition is not met, the process stops with an explanatory error message.
+
+The cleaned dataset returned by `prepare_model_data()` is then used for both regression models. The main `estimatr::lm_robust()` model and the auxiliary `stats::lm()` model used for diagnostics are therefore estimated using exactly the same observations. This ensures that the main regression results and the diagnostic results are based on the same estimation sample.
 
 ## Model Estimation Workflow
- 
-The model estimation process was first developed as a simple prototype, independently of the Shiny application. At this stage, the built-in `mtcars` dataset was used. `mtcars` is not the dataset that will be used for the project's final economic application; it was used only to develop and test the initial regression workflow.
-
+The model estimation process was first developed as a simple prototype, independently of the Shiny application. At this stage, the built-in mtcars dataset was used. mtcars is not the dataset that will be used for the project's final economic application; it was used only to develop and test the initial regression workflow.
 In the prototype, the model `mpg ~ wt + hp` was estimated in three different ways. First, a standard `stats::lm()` model was fitted. The same model was then estimated twice using `estimatr::lm_robust()`, once with classical standard errors and once with HC3 standard errors. This initial comparison allowed us to examine how `lm_robust()` could be used within the planned regression workflow. Because the data and model formula were unchanged, the coefficient estimates remained the same, while changing the standard-error specification could affect measures of statistical uncertainty such as standard errors, p-values, and confidence intervals.
-
 Since the model results needed to be used programmatically in later stages, we did not rely only on console output. `broom::tidy()` was used to extract term-level results such as coefficient estimates, standard errors, p-values, and confidence intervals in a tidy format. `broom::glance()` was used to extract model-level summary statistics. The prototype also examined fitted values and residuals, compared the main results of the three models in a common table, and carried out equality checks on the coefficient estimates and standard errors. These comparisons were used during development to inspect the behaviour of the model objects more directly.
-
-After the initial prototype, the `run_regression()` function was created to make the workflow reusable. The function takes the dataset, the dependent variable, the independent variables, and the selected standard error type as arguments. Before estimation, `prepare_model_data()` is called to prepare the selected variables, remove incomplete observations, and record the observation counts.
-
+After the initial prototype, the `run_regression()` function was created to make the workflow reusable. The function takes the dataset, the dependent variable, the independent variables, and the selected standard error type as arguments. The supported standard error specifications are classical, HC1, HC2, and HC3. If another value is supplied, the function stops before estimation with a controlled error message.
+Before estimation, `run_regression()` calls `prepare_model_data()` to check and prepare the selected variables, remove incomplete observations, and record the observation counts.
 The model formula is then constructed from the selected variable names using `stats::reformulate()`. This provides a programmatic way to construct an R model formula from variable names supplied as character values. The same cleaned data and the same formula are then used to estimate the main regression model with `estimatr::lm_robust()` and the auxiliary diagnostic model with `stats::lm()`.
-
-The `run_regression()` function also stores the formula, the cleaned model data, the selected standard error type, and the observation counts alongside the two model objects in the same result list. As a result, the regression steps that were initially carried out one by one in the prototype have been turned into a reusable model estimation function that can be called independently of the Shiny interface.
+Both model-estimation steps are wrapped in `tryCatch()`. If a problem that was not detected during the earlier validation stage causes either model to fail, the error is captured and reported through a controlled error message. The message also identifies whether the failure occurred in the main robust model or in the auxiliary diagnostic model.
+Finally, `run_regression()` stores the two model objects together with the formula, cleaned model data, selected standard error type, and observation counts in the same result list. As a result, the regression steps that were initially carried out one by one in the prototype have been turned into a reusable estimation workflow that can be tested and used independently of the Shiny interface.
 
 # Advanced R Implementation
  
@@ -181,6 +272,8 @@ The `run_regression()` function also stores the formula, the cleaned model data,
 This section will document the Shiny application.
  
 ## User Interface
+
+## User Workflow
  
 ## Reactive Workflow
  
@@ -188,7 +281,14 @@ This section will document the Shiny application.
 
  
 # Economic Application and Results
- 
+
+## Dataset and Variables
+
+## Model Specification
+
+## Regression Results
+
+## Diagnostic Results
  
 # Testing and Limitations
  

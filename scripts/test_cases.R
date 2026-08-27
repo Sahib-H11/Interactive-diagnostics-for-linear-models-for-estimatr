@@ -12,6 +12,8 @@ source("R/model_functions.R")
 source("R/diagnostic_functions.R")
 source("R/plotting_functions.R")
 source("R/table_functions.R")
+source("R/s3_methods.R")
+
 
 
 # Test Case 1: Valid model with multiple predictors
@@ -285,3 +287,80 @@ stopifnot(
 
 cat("\nTEST 13 PASSED\n")
 
+# TEST 14: S3 regression_result object
+cat("\n=== TEST 14: S3 regression_result object ===\n")
+
+s3_result <- create_regression_result(
+  test_model
+)
+
+print(class(s3_result))
+print(names(s3_result))
+
+stopifnot(
+  inherits(
+    s3_result,
+    "regression_result"
+  ),
+  all(
+    c(
+      "robust_model",
+      "diagnostic_model",
+      "coefficients",
+      "diagnostics",
+      "plots",
+      "warnings",
+      "data_info",
+      "settings"
+    ) %in% names(s3_result)
+  )
+)
+
+cat("\nTEST 14 PASSED\n")
+
+# TEST 15: Standard error comparison with purrr
+cat("\n=== TEST 15: Standard error comparison with purrr ===\n")
+
+se_comparison <- compare_standard_errors(
+  data = mtcars,
+  dependent_var = "mpg",
+  independent_vars = c("wt", "hp")
+)
+
+print(nrow(se_comparison))
+print(unique(se_comparison$se_type))
+
+stopifnot(
+  nrow(se_comparison) == 12L,
+  identical(
+    unique(se_comparison$se_type),
+    c(
+      "classical",
+      "HC1",
+      "HC2",
+      "HC3"
+    )
+  )
+)
+
+estimate_counts <- aggregate(
+  estimate ~ term,
+  data = se_comparison,
+  FUN = function(x) {
+    length(
+      unique(
+        round(x, 10)
+      )
+    )
+  }
+)
+
+print(estimate_counts)
+
+stopifnot(
+  all(
+    estimate_counts$estimate == 1L
+  )
+)
+
+cat("\nTEST 15 PASSED\n")
