@@ -41,11 +41,15 @@ language: english
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+ 
 library(gt)
 library(dplyr)
 library(broom)
+ 
+source("../R/data_functions.R")
+source("../R/model_functions.R")
+source("../R/table_functions.R")
 ```
-
 
 # Introduction
 
@@ -89,15 +93,11 @@ It is also a core requirement that the main `estimatr::lm_robust()` model and th
  
 ## Linear Regression and Ordinary Least Squares
 A multiple linear regression model relates a dependent variable to one or more independent variables and can be written as
-
 $$
 y_i = \beta_0 + \beta_1 x_{i1} + \dots + \beta_k x_{ik} + \varepsilon_i,
 $$
-
 where $y_i$ is the dependent variable, $x_{i1}, \dots, x_{ik}$ are the independent variables, $\beta_0, \dots, \beta_k$ are the unknown regression coefficients, and $\varepsilon_i$ is the error term representing factors that are not explicitly included in the model.
-
 The ordinary least squares (OLS) method estimates the regression coefficients by choosing the values that minimize the sum of squared differences between the observed and fitted values:
-
 $$
 \hat{\beta}
 =
@@ -105,122 +105,85 @@ $$
 \sum_{i=1}^{n}
 (y_i-x_i'\beta)^2.
 $$
-
 When the design matrix has full column rank, the OLS estimator can also be written in matrix form as
-
 $$
 \hat{\beta}=(X'X)^{-1}X'y.
 $$
-
 Once the model has been estimated, the fitted value for observation $i$ is denoted $\hat{y}_i$, and the residual is given by
-
 $$
 \hat{\varepsilon}_i=y_i-\hat{y}_i.
 $$
-
 It is important to distinguish between the error term and the residual. The error term $\varepsilon_i$ is an unobservable component of the population model, whereas the residual $\hat{\varepsilon}_i$ can only be computed once the model has been estimated. For this reason, it is the residuals — not the errors — that are examined in the regression diagnostics discussed later in this report.
-
 Under standard conditions such as random sampling, linearity in the parameters, the absence of perfect multicollinearity, and a zero conditional mean of the error term, OLS produces unbiased coefficient estimates. If the conditional variance of the error term is also constant, meaning that the errors are homoskedastic, the Gauss--Markov theorem states that OLS is the best linear unbiased estimator (BLUE). Homoskedasticity is therefore not required for the unbiasedness of the OLS coefficients, but it is required for the conventional homoskedastic variance and standard error formulas to be valid. This distinction underlies the difference between classical and heteroskedasticity-robust standard errors discussed in the following sections.
 In this project, the main regression model is estimated using `estimatr::lm_robust()`. When the same model formula and estimation sample are used, changing the standard error specification does not change the underlying OLS coefficient estimates; instead, it affects the estimated standard errors and the related inference measures. An auxiliary `stats::lm()` model is also fitted using the same cleaned data and model formula and is used for the diagnostic procedures discussed later in the report.
 
  
 ## Classical Standard Errors
-
 Under the assumption of homoskedasticity, the conditional variance of the OLS estimator can be written as
-
 $$
 \mathrm{Var}(\hat{\beta} \mid X)
 =
 \sigma^2 (X'X)^{-1},
 $$
-
 where $\sigma^2$ represents the constant conditional variance of the error term. Because this variance is unknown in practice, it is estimated using the regression residuals. The classical standard error of each coefficient is obtained from the corresponding diagonal element of the estimated variance-covariance matrix.
-
 Standard errors are important because they describe the uncertainty surrounding the estimated regression coefficients. Together with the coefficient estimates, they are used to calculate quantities such as t-statistics, p-values, and confidence intervals.
-
 The classical standard error formula relies on the homoskedasticity assumption. If the error variance differs across observations, the classical standard errors may understate or overstate the sampling uncertainty of the coefficient estimates. The OLS coefficients may still remain unbiased under the assumptions discussed in the previous section, but the resulting statistical inference based on classical standard errors can become unreliable. This limitation motivates the use of heteroskedasticity-robust standard errors, which are discussed in the next section.
-
 In this project, classical standard errors are one of the four standard error options available through `estimatr::lm_robust()`, together with HC1, HC2, and HC3. Selecting `se_type = "classical"` uses the classical specification, while the other options provide heteroskedasticity-robust alternatives.
  
 ## Heteroskedasticity and Robust Standard Errors
-
 The homoskedasticity assumption requires the conditional variance of the error term to be constant across observations. When this variance differs across observations, the errors are heteroskedastic. In this case,
 
 $$
 Var(\varepsilon_i \mid X)
 $$
-
 is not necessarily the same for every observation.
-
 When heteroskedasticity is present, the OLS coefficient estimates may remain unbiased under the conditions discussed earlier, but the classical standard error formula may no longer describe their sampling uncertainty correctly. As a result, standard errors, p-values, and confidence intervals based on the classical formula can become misleading. Heteroskedasticity therefore affects statistical inference rather than automatically changing the OLS coefficient estimates themselves.
-
 Heteroskedasticity-robust standard errors address this problem by using an alternative estimate of the variance-covariance matrix. A general heteroskedasticity-consistent estimator can be written as
-
 $$
 \widehat{Var}_{HC}(\hat{\beta})
 =
 (X'X)^{-1}X'\hat{\Omega}X(X'X)^{-1},
 $$
-
 where $\hat{\Omega}$ is a diagonal matrix containing estimated observation-specific error variances based on the regression residuals. This form is often referred to as a sandwich estimator.
-
 The project includes three heteroskedasticity-robust options: HC1, HC2, and HC3. Their main difference is how the squared residuals are adjusted when estimating the variance. Let $h_{ii}$ denote the leverage of observation $i$. HC1 applies a degrees-of-freedom scaling based on the sample size and number of estimated coefficients. HC2 adjusts the squared residuals by dividing them by $1-h_{ii}$, while HC3 uses the stronger adjustment $(1-h_{ii})^2$ in the denominator. 
-
 None of these alternatives should be treated as universally best. HC1 provides a relatively simple finite-sample adjustment, whereas HC2 and HC3 account directly for leverage. HC3 applies the stronger leverage correction and can therefore be useful when high-leverage observations or smaller samples are a concern, although it may also produce larger standard errors. For this reason, the application does not impose a single robust specification and instead allows the user to choose between Classical, HC1, HC2, and HC3 standard errors.
 
 In this project, the main regression model is estimated with `estimatr::lm_robust()`, and the selected standard error specification is passed through the `se_type` argument. When the model formula and cleaned estimation sample remain unchanged, switching between Classical, HC1, HC2, and HC3 does not change the underlying OLS coefficient estimates. Instead, it changes how the uncertainty around those estimates is calculated. This makes the comparison between classical and robust standard errors a direct part of the regression workflow.
  
- 
 # Regression Diagnostics
  
 ## Residuals versus Fitted Plot
-
 The residuals-versus-fitted plot displays the residuals of the auxiliary `lm()` model on the vertical axis against the fitted values on the horizontal axis. In a well-behaved linear model, the residuals should be scattered around zero without a clear systematic pattern and with a roughly constant spread across the range of fitted values.
-
 Systematic deviations from this pattern can point to potential problems. A funnel-shaped pattern, where the spread of the residuals becomes wider or narrower as the fitted values change, may suggest heteroskedasticity. A curved or otherwise non-random pattern may indicate that the linear functional form does not adequately capture the relationship between the dependent and independent variables. The plot is therefore a visual diagnostic and complements the formal heteroskedasticity test discussed later, rather than replacing it.
-
 In the project, the plot is produced by `plot_residuals_vs_fitted()`. The function extracts fitted values and residuals from the auxiliary `stats::lm()` model using `stats::fitted()` and `stats::residuals()`, displays them with `ggplot2`, and adds a horizontal reference line at zero. Because the auxiliary diagnostic model is estimated using the same cleaned data and model formula and does not depend on the selected standard-error type, the residuals used in this plot remain the same when the user switches between Classical, HC1, HC2, and HC3 standard errors.
  
 ## Normal QQ Plot
-
 The Normal QQ (quantile-quantile) plot compares the quantiles of the residuals from the auxiliary `lm()` model with the quantiles of a theoretical normal distribution. If the residuals are approximately normally distributed, the points should lie reasonably close to the reference line. Systematic departures from this line, particularly in the tails, may indicate heavier tails, skewness, or unusual observations.
 
 Normality is not required for the OLS coefficient estimates to be unbiased under the assumptions discussed earlier. It is mainly relevant for exact small-sample inference in the classical linear regression framework, including t-tests, F-tests, and confidence intervals. In larger samples, inference is generally less sensitive to moderate departures from normality. The QQ plot is therefore treated as a visual diagnostic rather than as a formal pass-or-fail test, and no separate numerical normality test is included in the application.
-
 In the project, the plot is produced by `plot_qq()`, which extracts residuals from the auxiliary `stats::lm()` model using `stats::residuals()` and displays them with `ggplot2::stat_qq()` and `ggplot2::stat_qq_line()`. As with the residuals-versus-fitted plot, this diagnostic is based on the auxiliary model and therefore does not change when the user switches between the four available standard-error specifications.
  
 ## Studentized Breusch--Pagan Test
-
 The residuals-versus-fitted plot provides a visual way to examine possible changes in the error variance, while the Studentized Breusch--Pagan test provides a formal assessment of heteroskedasticity.
-
 The null hypothesis of the test is homoskedasticity, meaning that the conditional variance of the error term is constant. The alternative hypothesis is that the variance changes systematically with one or more of the explanatory variables:
-
 $$
 H_0: \text{Homoskedasticity}
 $$
-
 $$
 H_1: \text{Heteroskedasticity}
 $$
-
 Interpretation is based on the resulting p-value. For example, at a 5% significance level, a p-value below 0.05 provides evidence against the null hypothesis and therefore suggests heteroskedasticity. A larger p-value should not be interpreted as proof of homoskedasticity; it only means that there is not sufficient evidence to reject the null hypothesis in the current sample.
 
 The project uses Koenker's studentized version of the Breusch--Pagan test. In `lmtest::bptest()`, this is implemented with `studentize = TRUE`. The studentized modification was developed to reduce the sensitivity of the original test to the normality assumption. Because no separate variance formula is specified in the project, the explanatory variables from the fitted regression model are used in the test.
-
 In the project, `calculate_bp_test()` applies the test to the auxiliary `stats::lm()` model and returns the test statistic, degrees of freedom, p-value, and method name. Together with the residuals-versus-fitted plot, this provides both graphical and formal information about possible heteroskedasticity.
 
 ## Variance Inflation Factors
-
 Variance Inflation Factors (VIFs) are used to assess multicollinearity, that is, the extent to which a predictor is linearly related to the other predictors in a regression model. For each predictor, the VIF is defined as
-
 $$
 VIF_j = \frac{1}{1-R_j^2}
 $$
-
 where $R_j^2$ is obtained by regressing predictor $j$ on the remaining predictors. A VIF of 1 indicates no variance inflation due to linear relationships with the other predictors. Higher values indicate that a larger share of the variation in the predictor can be explained by the remaining predictors, which increases the variance and standard error of the corresponding coefficient estimate. Multicollinearity can therefore reduce the precision of individual coefficient estimates and make their separate effects more difficult to interpret, although it does not by itself make the OLS coefficient estimates biased under the assumptions discussed earlier.
-
 There is no universally agreed VIF threshold above which multicollinearity should automatically be considered problematic. Values such as 5 or 10 are often used as practical rules of thumb, but their interpretation depends on the context of the analysis. A high VIF therefore indicates that multicollinearity deserves further attention, but it does not by itself imply that a predictor must be removed from the model.
-
 VIF calculations require a predictor to be compared with other predictors and are therefore not meaningful for a model containing only one predictor. In this project, `calculate_vif()` first checks the number of predictors in the auxiliary `stats::lm()` model. If only one predictor is present, the function returns an explanatory message instead of a VIF value. Otherwise, it applies `car::vif()` and returns the calculated VIF values together with the corresponding variable names.
  
 # Software Architecture and Data Workflow
@@ -237,15 +200,10 @@ Two functions were developed to carry out basic data and variable checks before 
 Rather than being built directly into the model estimation function, these checks are kept in separate functions. This keeps data validation and model estimation as distinct tasks and allows the same validation functions to be reused later in the Shiny application. Using `call. = FALSE` in the error messages suppresses the function call from the error output, keeping the messages cleaner and easier to read.
 
 ## Data Preparation and Missing-Data Handling
-
 Model estimation only requires the variables selected by the user. Before preparing the model dataset, `prepare_model_data()` calls `check_data()` and `validate_variables()` to check the data and variable selections. It then creates a smaller model dataset consisting only of the dependent variable and the selected independent variables.
-
 Complete observations are identified based only on these variables using `stats::complete.cases()`. This function returns a logical vector indicating which observations contain no missing values. Any observation with a missing value in one of the selected model variables is removed before the model is estimated. As a result, missing values in variables that are not part of the model do not lead to unnecessary loss of observations.
-
 The function also records the original number of observations, the number removed due to missing values, and the number remaining after cleaning. This information can later be used to show the user how many observations the model was estimated on and how many were dropped during data preparation.
-
 After cleaning, the function checks whether enough observations remain for model estimation. In the current implementation, the minimum number of observations is defined as the number of independent variables plus two. This basic check is intended to prevent estimation from continuing when too few complete observations remain. If the condition is not met, the process stops with an explanatory error message.
-
 The cleaned dataset returned by `prepare_model_data()` is then used for both regression models. The main `estimatr::lm_robust()` model and the auxiliary `stats::lm()` model used for diagnostics are therefore estimated using exactly the same observations. This ensures that the main regression results and the diagnostic results are based on the same estimation sample.
 
 ## Model Estimation Workflow
@@ -258,14 +216,199 @@ The model formula is then constructed from the selected variable names using `st
 Both model-estimation steps are wrapped in `tryCatch()`. If a problem that was not detected during the earlier validation stage causes either model to fail, the error is captured and reported through a controlled error message. The message also identifies whether the failure occurred in the main robust model or in the auxiliary diagnostic model.
 Finally, `run_regression()` stores the two model objects together with the formula, cleaned model data, selected standard error type, and observation counts in the same result list. As a result, the regression steps that were initially carried out one by one in the prototype have been turned into a reusable estimation workflow that can be tested and used independently of the Shiny interface.
 
+To illustrate the output produced by the reusable estimation workflow, Table 1
+shows the coefficient results for the `mtcars` development model estimated
+with HC3 standard errors. The table is generated directly from the
+`lm_robust()` model returned by `run_regression()` using
+`create_coefficient_table()`.
+
+```{r coefficient-table-example, echo=FALSE}
+
+report_model <- run_regression(
+
+  data = mtcars,
+
+  dependent_var = "mpg",
+
+  independent_vars = c("wt", "hp"),
+
+  se_type = "HC3"
+
+)
+ 
+create_coefficient_table(
+  report_model$robust_model
+) |>
+  gt::tab_caption(
+    "Regression coefficient table for the mtcars development example using HC3 standard errors."
+  ) |>
+  gt::tab_options(
+    latex.tbl.pos = "h"
+  )
+```
+ 
+ 
 # Advanced R Implementation
  
 ## Modular Function Design
- 
+A central design choice in this project was to keep the statistical backend separate from the Shiny interface. The initial regression prototype helped identify several operations that would be needed repeatedly as the project developed, including data validation, data preparation, model estimation, diagnostic testing, plotting, and result formatting. Rather than placing these operations directly inside the Shiny server, they were implemented as reusable R functions.
+The functions in the `R/` directory are grouped according to their main responsibilities. Data checking and preparation are handled in `data_functions.R`, while model estimation is implemented in `model_functions.R`. Diagnostic tests, diagnostic plots, and regression tables are contained in separate files, and the S3 functionality introduced in Week 4 is placed in `s3_methods.R`. This structure keeps the different stages of the analysis easier to identify and avoids concentrating the complete workflow in one large script. The functions are also designed to build on each other. For example,
+`run_regression()` does not duplicate the data-validation and cleaning logic.
+Instead, it calls `prepare_model_data()`, which in turn uses the existing data
+and variable checks before returning the cleaned estimation sample. The same
+cleaned data and model formula are then used to estimate the main
+`lm_robust()` model and the auxiliary `lm()` model. Similarly,
+`create_regression_result()` reuses the existing functions for the coefficient
+table, the Breusch--Pagan test, VIF analysis, and the two diagnostic plots
+rather than implementing these calculations again.
+This organization has practical advantages for development and testing. The
+statistical backend can be run independently of Shiny, which allowed the
+individual functions to be tested before they were connected to the
+application. The test cases in `scripts/test_cases.R`, for example, call the
+same backend functions without starting a Shiny session. The Shiny application
+can then reuse `run_regression()` rather than maintaining a separate version of
+the estimation workflow.
+Keeping repeated operations in reusable functions also reduces code
+duplication. If the implementation of a particular step changes, the relevant
+function can be updated in one place instead of modifying several copies of the
+same calculation. In the context of this project, the modular backend therefore
+provides a common foundation for the Shiny interface as well as for the
+functional-programming and S3 components discussed in the following sections.
+
 ## Functional Programming with purrr
- 
-## S3 Object-Oriented Programming
- 
+The project's main functional-programming component compares the four
+supported standard-error specifications---Classical, HC1, HC2, and HC3---for
+the same regression model. This comparison is implemented in
+`compare_standard_errors()`. The function first prepares the estimation sample
+with `prepare_model_data()` and constructs the model formula with
+`stats::reformulate()`. It then defines a vector containing the four supported
+standard-error types.
+`purrr::map()` is used to apply the same `estimatr::lm_robust()` call to each
+element of this vector. Across these repeated estimations, the cleaned dataset
+and model formula remain unchanged, while only the `se_type` argument varies.
+The result is a list containing four model objects. This avoids maintaining
+four nearly identical model-estimation blocks and expresses the repeated task
+as one operation applied systematically to several inputs.
+The resulting model objects are then processed together with their
+corresponding standard-error labels using `purrr::map2()`. Each model is
+passed to `broom::tidy()` to extract the coefficient estimates, standard
+errors, confidence intervals, and p-values. The corresponding standard-error
+type is added as an additional variable so that the results remain identifiable
+after they are combined. Finally, `purrr::list_rbind()` joins the individual
+data frames into a single comparison table.
+This use of functional programming is connected directly to the econometric
+purpose of the application rather than being included only as a demonstration
+of `purrr`. For a fixed dataset and model specification, changing the
+standard-error estimator affects the estimated uncertainty and therefore the
+standard errors, confidence intervals, and p-values, while the coefficient
+estimates remain unchanged. The resulting comparison is shown in Table 2, which makes these differences
+visible in a structured form without requiring four separate model outputs.
+The implementation is also covered by the backend tests. TEST 15 in
+`scripts/test_cases.R` verifies that the comparison produces the expected
+total number of rows for the test model and that all four supported
+standard-error specifications are present. It additionally checks that the
+coefficient estimates are identical across the four specifications when the
+data and model formula are held constant. This provides a simple validation
+that the repeated estimation and result-combination workflow behaves as
+intended.
+
+```{r se-comparison-table, echo=FALSE}
+se_comparison_report <- compare_standard_errors(
+  data = mtcars,
+  dependent_var = "mpg",
+  independent_vars = c("wt", "hp")
+)
+
+se_comparison_report |>
+  gt::gt() |>
+  gt::cols_label(
+    se_type = "SE Type",
+    term = "Term",
+    estimate = "Estimate",
+    std.error = "Std. Error",
+    conf.low = "CI Lower",
+    conf.high = "CI Upper",
+    p.value = "p-value"
+  ) |>
+  gt::fmt_number(
+    columns = c(
+      estimate,
+      std.error,
+      conf.low,
+      conf.high
+    ),
+    decimals = 3
+  ) |>
+  gt::fmt(
+    columns = p.value,
+    fns = function(x) {
+      ifelse(
+        x < 0.001,
+        "<0.001",
+        formatC(
+          x,
+          format = "f",
+          digits = 3
+        )
+      )
+    }
+  ) |>
+  gt::tab_caption(
+    "Comparison of Classical, HC1, HC2, and HC3 standard errors for the mtcars development example."
+  ) |>
+  gt::tab_options(
+  latex.use_longtable = TRUE
+)
+```
+
+
+##  S3 Object-Oriented Programming
+The project uses R's S3 class system to combine the outputs of a completed
+regression analysis into a single structured object. Before the S3 component
+was introduced, the regression workflow produced several related outputs,
+including the main `lm_robust()` model, the auxiliary `lm()` model,
+diagnostic-test results, diagnostic plots, the coefficient table, and
+information about the estimation sample. The custom class
+`regression_result` provides a common structure in which these outputs can be
+stored and accessed together.
+The object is created by `create_regression_result()`. The function receives
+the structured list returned by `run_regression()` and first checks that the
+required model and data components are available. It then reuses the existing
+backend functions: `create_coefficient_table()` produces the coefficient
+table, `calculate_bp_test()` and `calculate_vif()` provide the diagnostic
+results, and `plot_residuals_vs_fitted()` and `plot_qq()` create the two
+diagnostic plots. These outputs are stored together with the model objects,
+data information, and model settings. If the VIF function returns an
+explanatory message, for example for a model with only one predictor, this
+message is also retained in the object. The resulting list is finally assigned
+the class `"regression_result"`.
+Assigning this class allows R's S3 method-dispatch mechanism to select methods
+written specifically for `regression_result` objects. Two methods were
+implemented: `print.regression_result()` and
+`summary.regression_result()`. As a result, the familiar generic functions
+`print()` and `summary()` can be used with the custom result object without
+introducing separate user-facing commands.
+The `print()` method provides a concise overview of an estimated model. It
+reports the model formula, the selected standard-error specification, the
+number of observations used for estimation, and the number of observations
+removed during data preparation. This avoids printing the substantially larger
+underlying model objects when only the basic model information is required.
+The `summary()` method provides a more detailed view. In addition to the model
+settings and observation counts, it uses `broom::glance()` on the stored
+`lm_robust()` model to obtain the R-squared and adjusted R-squared values. It
+also reports the statistic and p-value of the studentized Breusch--Pagan test
+and displays the VIF results. For a model with only one predictor, the VIF
+table is replaced by the explanatory message returned by the diagnostic
+function.
+The purpose of the S3 class is not to define a new statistical model, but to
+provide a consistent interface for the different outputs already produced by
+the modular backend. The statistical calculations remain in their dedicated
+functions, while the S3 object organizes their results and provides different
+levels of output through standard R generics. TEST 14 in
+`scripts/test_cases.R` verifies that an object created by
+`create_regression_result()` inherits from the `"regression_result"` class
+and contains the expected model, coefficient, diagnostic, plot, warning, data,
+and settings components.
  
 # Shiny Application
  
