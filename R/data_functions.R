@@ -111,6 +111,7 @@ validate_variables <- function(
       call. = FALSE
     )
   }
+  # Identify selected independent variables that are not numeric
   non_numeric_independent_vars <- independent_vars[
     !vapply(
       data[independent_vars],
@@ -161,6 +162,7 @@ prepare_model_data <- function(
     drop = FALSE
   ]
   
+  # Keep only complete observations for the selected model variables
   complete_rows <- stats::complete.cases(model_data)
   
   cleaned_data <- model_data[
@@ -169,6 +171,7 @@ prepare_model_data <- function(
     drop = FALSE
   ]
   
+  # Require enough observations to estimate the selected model
   minimum_observations <- length(independent_vars) + 2L
   
   if (nrow(cleaned_data) < minimum_observations) {

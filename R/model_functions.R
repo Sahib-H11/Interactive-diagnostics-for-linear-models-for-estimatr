@@ -35,11 +35,13 @@ run_regression <- function(
     independent_vars = independent_vars
   )
   
+  # Create the regression formula from the selected variables
   model_formula <- stats::reformulate(
     termlabels = independent_vars,
     response = dependent_var
   )
   
+  # Estimate the main model and return a clear error message if estimation fails
   robust_model <- tryCatch(
     estimatr::lm_robust(
       formula = model_formula,

@@ -443,8 +443,6 @@ server <- function(input, output, session) {
       }
     )
     
-    req(uploaded_data)
-    
     return(uploaded_data)
   })
   
@@ -540,6 +538,15 @@ server <- function(input, output, session) {
       tryCatch(
         {
           current_data <- selected_data()
+          if (is.null(current_data)) {
+            showNotification(
+              "The uploaded file could not be analyzed. Please choose a valid CSV file.",
+              type = "error",
+              duration = 5
+            )
+            
+            req(FALSE)
+          }
           
           numeric_vars <- names(current_data)[
             vapply(
@@ -569,11 +576,15 @@ server <- function(input, output, session) {
         },
         error = function(e) {
           
-          showNotification(
-            conditionMessage(e),
-            type = "error",
-            duration = 5
-          )
+          error_message <- conditionMessage(e)
+          
+          if (nzchar(error_message)) {
+            showNotification(
+              error_message,
+              type = "error",
+              duration = 5
+            )
+          }
           
           req(FALSE)
         }

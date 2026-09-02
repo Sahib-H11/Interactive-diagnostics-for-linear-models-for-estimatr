@@ -62,6 +62,8 @@ create_regression_result <- function(model_result) {
     model_result$diagnostic_model
   )
   
+  # Start with an empty vector for user-facing warning messages.
+  # Currently, this is used when VIF cannot be calculated for a single-predictor model.
   warning_messages <- character(0)
   
   if (!is.null(vif_result$message)) {
@@ -98,6 +100,7 @@ create_regression_result <- function(model_result) {
     )
   )
   
+  # Assign the custom S3 class so print() and summary() use the methods below
   class(result) <- "regression_result"
   
   return(result)
@@ -210,6 +213,8 @@ summary.regression_result <- function(object, ...) {
   
   cat("\nVariance Inflation Factors\n")
   
+  # Falls back to the explanatory message when VIF was not calculated
+  # for a single-predictor model.
   if (is.null(object$diagnostics$vif$values)) {
     
     cat(

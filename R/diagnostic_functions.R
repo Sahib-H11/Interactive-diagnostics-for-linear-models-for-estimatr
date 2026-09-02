@@ -42,6 +42,7 @@ calculate_vif <- function(diagnostic_model) {
       call. = FALSE
     )
   }
+  # Extract predictor names from the diagnostic model
   predictor_names <- attr(
     stats::terms(diagnostic_model),
     "term.labels"
@@ -57,7 +58,9 @@ calculate_vif <- function(diagnostic_model) {
       )
     )
   }
+  # Calculate VIF values for models with at least two predictors
   vif_values <- car::vif(diagnostic_model)
+  # Convert the named VIF values into a data frame for later output
   result <- list(
     values = data.frame(
       variable = names(vif_values),

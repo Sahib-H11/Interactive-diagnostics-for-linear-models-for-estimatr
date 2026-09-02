@@ -56,6 +56,8 @@ create_coefficient_table <- function(robust_model) {
     decimals = 3
   )
   
+  # Uses "<0.001" instead of a rounded number for very small p-values,
+  # avoiding 0.000 as if the p-value were exactly zero.
   coefficient_table <- gt::fmt(
     coefficient_table,
     columns = p.value,
