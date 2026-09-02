@@ -28,14 +28,23 @@ plot_residuals_vs_fitted <- function(diagnostic_model) {
     ggplot2::geom_point() +
     ggplot2::geom_hline(
       yintercept = 0,
-      linetype = "dashed"
+      linetype = "dashed",
+      color = "#E67E22",
+      linewidth = 0.8
     ) +
     ggplot2::labs(
       title = "Residuals vs Fitted",
       x = "Fitted Values",
       y = "Residuals"
     ) +
-    ggplot2::theme_minimal()
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        color = "#1a2b47",
+        face = "bold",
+        size = 16
+      )
+    )
   return(plot)
 }
 
@@ -71,7 +80,10 @@ plot_qq <- function(diagnostic_model) {
     
     ggplot2::stat_qq() +
     
-    ggplot2::stat_qq_line() +
+    ggplot2::stat_qq_line(
+      color = "#E67E22",
+      linewidth = 0.8
+    ) +
     
     ggplot2::labs(
       
@@ -83,7 +95,14 @@ plot_qq <- function(diagnostic_model) {
       
     ) +
     
-    ggplot2::theme_minimal()
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        color = "#1a2b47",
+        face = "bold",
+        size = 16
+      )
+    )
   
   return(plot)
   

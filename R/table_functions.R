@@ -71,7 +71,49 @@ create_coefficient_table <- function(robust_model) {
       )
     }
   )
+  coefficient_table <- gt::tab_style(
+    coefficient_table,
+    style = list(
+      gt::cell_fill(
+        color = "#EEF3F7"
+      ),
+      gt::cell_text(
+        weight = "bold",
+        color = "#1a2b47"
+      ),
+      gt::cell_borders(
+        sides = "bottom",
+        color = "#E67E22",
+        weight = gt::px(2)
+      )
+    ),
+    locations = gt::cells_column_labels(
+      columns = c(
+        term,
+        estimate,
+        std.error,
+        conf.low,
+        conf.high,
+        p.value
+      )
+    )
+  )
   
+  coefficient_table <- gt::tab_style(
+    coefficient_table,
+    style = list(
+      gt::cell_fill(
+        color = "#EEF3F7"
+      ),
+      gt::cell_text(
+        weight = "bold",
+        color = "#1a2b47"
+      )
+    ),
+    locations = gt::cells_body(
+      columns = term
+    )
+  )
   return(coefficient_table)
 }
 
