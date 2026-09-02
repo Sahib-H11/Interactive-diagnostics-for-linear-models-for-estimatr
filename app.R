@@ -385,6 +385,28 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   
+  observeEvent(
+    input$dataset,
+    {
+      if (input$dataset == "upload_csv") {
+        
+        updateSelectInput(
+          session,
+          "dependent_var",
+          choices = character(0),
+          selected = character(0)
+        )
+        
+        updateSelectInput(
+          session,
+          "independent_vars",
+          choices = character(0),
+          selected = character(0)
+        )
+      }
+    }
+  )
+  
   selected_data <- reactive({
     
     if (input$dataset == "economic_example") {
@@ -394,17 +416,34 @@ server <- function(input, output, session) {
     req(input$csv_file)
     
     uploaded_data <- tryCatch(
-      readr::read_csv(
-        input$csv_file$datapath,
-        show_col_types = FALSE
-      ),
-      error = function(e) {
-        stop(
-          "The uploaded file could not be analyzed.",
-          call. = FALSE
+      {
+        data <- readr::read_csv(
+          input$csv_file$datapath,
+          show_col_types = FALSE
         )
+        
+        if (
+          nrow(data) == 0L ||
+          ncol(data) == 0L
+        ) {
+          stop("Invalid or empty CSV file.")
+        }
+        
+        data
+      },
+      error = function(e) {
+        
+        showNotification(
+          "The uploaded file could not be analyzed.",
+          type = "error",
+          duration = 5
+        )
+        
+        return(NULL)
       }
     )
+    
+    req(uploaded_data)
     
     return(uploaded_data)
   })
@@ -483,14 +522,61 @@ server <- function(input, output, session) {
   model_result <- eventReactive(
     input$estimate_model,
     {
-      regression_model <- run_regression(
-        data = selected_data(),
-        dependent_var = input$dependent_var,
-        independent_vars = input$independent_vars,
-        se_type = input$se_type
-      )
-      create_regression_result(
-        regression_model
+      
+      if (
+        input$dataset == "upload_csv" &&
+        is.null(input$csv_file)
+      ) {
+        
+        showNotification(
+          "Please upload a CSV file before estimating the model.",
+          type = "error",
+          duration = 5
+        )
+        
+        req(input$csv_file)
+      }
+      
+      tryCatch(
+        {
+          current_data <- selected_data()
+          
+          numeric_vars <- names(current_data)[
+            vapply(
+              current_data,
+              is.numeric,
+              logical(1)
+            )
+          ]
+          
+          if (length(numeric_vars) == 0L) {
+            stop(
+              "The uploaded dataset does not contain any numeric variables.",
+              call. = FALSE
+            )
+          }
+          
+          regression_model <- run_regression(
+            data = current_data,
+            dependent_var = input$dependent_var,
+            independent_vars = input$independent_vars,
+            se_type = input$se_type
+          )
+          
+          create_regression_result(
+            regression_model
+          )
+        },
+        error = function(e) {
+          
+          showNotification(
+            conditionMessage(e),
+            type = "error",
+            duration = 5
+          )
+          
+          req(FALSE)
+        }
       )
     }
   )
@@ -510,7 +596,7 @@ server <- function(input, output, session) {
           "Diagnostics tab for diagnostic checks."
         ),
         type = "message",
-        duration = 5
+        duration = 7
       )
     }
   )
